@@ -275,10 +275,18 @@
             </div>
         </section>
 
-        <!-- 3. TAB MONITORING (GRAFIK GARIS TEGAS) -->
+        <!-- 3. TAB MONITORING (GRAFIK GRADIENT AREA DUAL AXIS) -->
         <section id="tab-monitoring" class="space-y-6 hidden">
             <div class="glass-card rounded-2xl p-6">
-                <h3 class="text-lg font-bold text-white mb-4">Grafik Tren Suhu & Kelembaban (Interval 20 Menit)</h3>
+                <div class="flex items-center space-x-3 mb-4">
+                    <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                        <i data-lucide="line-chart" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-white">Grafik Lingkungan</h3>
+                        <p class="text-xs text-gray-400">Perubahan suhu dan kelembaban (Real-Time)</p>
+                    </div>
+                </div>
                 <div class="w-full h-80"><canvas id="realtimeChart"></canvas></div>
             </div>
         </section>
@@ -287,12 +295,12 @@
         <section id="tab-riwayat" class="space-y-6 hidden">
             <div class="glass-card rounded-2xl p-6 space-y-6">
                 <div class="flex justify-between items-center">
-                    <h3 class="text-lg font-bold text-white">Tabel Log Riwayat (Interval 20 Menit)</h3>
+                    <h3 class="text-lg font-bold text-white">Tabel Log Riwayat (Interval 30 Menit)</h3>
                     <button onclick="exportToExcel()" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold">Unduh File Excel (.csv)</button>
                 </div>
-                <div class="overflow-x-auto border border-gray-800 rounded-xl">
+                <div class="overflow-x-auto border border-gray-800 rounded-xl max-h-96">
                     <table class="w-full text-left text-xs text-gray-300">
-                        <thead class="bg-gray-900/80 text-gray-400 uppercase border-b border-gray-800">
+                        <thead class="bg-gray-900/80 text-gray-400 uppercase border-b border-gray-800 sticky top-0">
                             <tr>
                                 <th class="px-4 py-3">Waktu</th>
                                 <th class="px-4 py-3">Suhu</th>
@@ -333,8 +341,9 @@
         window.historyLog = [];
         const relayKeys = ['LampuWC', 'LampuRuangTamu', 'LampuBelakang', 'LampuHias'];
 
-        let currentSuhu = 0;
-        let currentKelembaban = 0;
+        let currentSuhu = 28.0;
+        let currentKelembaban = 70;
+        let isFirstData = true; // Penanda untuk mengisi minimal 2 titik agar garis langsung terbentuk
 
         window.addEventListener('DOMContentLoaded', () => {
             initGauges();
@@ -342,26 +351,30 @@
             lucide.createIcons();
 
             db.ref('sensor/suhu').on('value', snapshot => {
-                const val = snapshot.val() || 0;
-                currentSuhu = parseFloat(val).toFixed(1);
-                updateSuhu(currentSuhu);
+                const val = snapshot.val();
+                if (val !== null) {
+                    currentSuhu = parseFloat(val).toFixed(1);
+                    updateSuhu(currentSuhu);
+                }
             });
 
             db.ref('sensor/kelembaban').on('value', snapshot => {
-                const val = snapshot.val() || 0;
-                currentKelembaban = parseInt(val);
-                updateKelembaban(currentKelembaban);
+                const val = snapshot.val();
+                if (val !== null) {
+                    currentKelembaban = parseInt(val);
+                    updateKelembaban(currentKelembaban);
+                }
             });
 
-            // Catat data pertama kali setelah 1 detik agar grafik langsung muncul titik/garisnya
+            // Catat data pertama kali secara instan
             setTimeout(() => {
                 pushLogAndChart();
-            }, 1000);
+            }, 800);
 
-            // Interval 20 Menit untuk Log & Grafik selanjutnya
+            // Interval 30 Menit untuk Log & Grafik selanjutnya
             setInterval(() => {
                 pushLogAndChart();
-            }, 20 * 60 * 1000); 
+            }, 30 * 60 * 1000); 
 
             relayKeys.forEach(key => {
                 db.ref(`Kontrol/${key}`).on('value', snapshot => {
@@ -375,12 +388,16 @@
             }, 1000);
         });
 
+        // Optimasi agar respons saklar instan tanpa jeda
         window.toggleRelay = function(key, isChecked) {
-            db.ref(`Kontrol/${key}`).set(isChecked ? 1 : 0);
+            const val = isChecked ? 1 : 0;
+            updateRelayUI(key, isChecked);
+            db.ref(`Kontrol/${key}`).set(val);
         };
 
         window.setAllRelays = function(val) {
             relayKeys.forEach(key => {
+                updateRelayUI(key, val === 1);
                 db.ref(`Kontrol/${key}`).set(val);
             });
         };
@@ -430,9 +447,17 @@
             }
         }
 
-        // Inisialisasi Grafik Line Chart
         function initChart() {
             const ctx = document.getElementById('realtimeChart').getContext('2d');
+            
+            const gradientSuhu = ctx.createLinearGradient(0, 0, 0, 300);
+            gradientSuhu.addColorStop(0, 'rgba(249, 115, 22, 0.4)');
+            gradientSuhu.addColorStop(1, 'rgba(249, 115, 22, 0.0)');
+
+            const gradientLembab = ctx.createLinearGradient(0, 0, 0, 300);
+            gradientLembab.addColorStop(0, 'rgba(59, 130, 246, 0.4)');
+            gradientLembab.addColorStop(1, 'rgba(59, 130, 246, 0.0)');
+
             realtimeChart = new Chart(ctx, {
                 type: 'line',
                 data: {
@@ -441,20 +466,24 @@
                         { 
                             label: 'Suhu (°C)', 
                             data: [], 
-                            borderColor: '#10B981', 
-                            backgroundColor: 'transparent', 
+                            borderColor: '#F97316', 
+                            backgroundColor: gradientSuhu, 
                             borderWidth: 2, 
-                            tension: 0.1, 
-                            pointRadius: 4
+                            fill: true,
+                            tension: 0.4, 
+                            pointRadius: 3,
+                            yAxisID: 'y'
                         },
                         { 
                             label: 'Kelembaban (%)', 
                             data: [], 
-                    borderColor: '#ef4444', 
-                            backgroundColor: 'transparent', 
+                            borderColor: '#3B82F6', 
+                            backgroundColor: gradientLembab, 
                             borderWidth: 2, 
-                            tension: 0.1, 
-                            pointRadius: 4
+                            fill: true,
+                            tension: 0.4, 
+                            pointRadius: 3,
+                            yAxisID: 'y1'
                         }
                     ]
                 },
@@ -462,16 +491,37 @@
                     responsive: true, 
                     maintainAspectRatio: false,
                     scales: {
-                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
-                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' }, beginAtZero: true, max: 100 }
+                        x: { 
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: '#9CA3AF' } 
+                        },
+                        y: { 
+                            type: 'linear',
+                            position: 'left',
+                            min: 20,
+                            max: 40,
+                            grid: { color: 'rgba(255,255,255,0.05)' }, 
+                            ticks: { color: '#F97316' } 
+                        },
+                        y1: { 
+                            type: 'linear',
+                            position: 'right',
+                            min: 40,
+                            max: 100,
+                            grid: { drawOnChartArea: false }, 
+                            ticks: { color: '#3B82F6' } 
+                        }
                     },
-                    plugins: { legend: { labels: { color: '#F3F4F6' } } }
+                    plugins: { 
+                        legend: { labels: { color: '#F3F4F6' } } 
+                    }
                 }
             });
         }
 
         function pushLogAndChart() {
-            const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
             const suhu = currentSuhu;
             const lembab = currentKelembaban;
             const wc = document.getElementById('status-LampuWC').innerText;
@@ -480,6 +530,20 @@
             const hias = document.getElementById('status-LampuHias').innerText;
 
             if (realtimeChart) {
+                // Jika ini data pertama, duplikasi titik awal ke masa lalu 1 menit sebelumnya agar garis langsung terhubung
+                if (isFirstData) {
+                    const pastTime = new Date(now.getTime() - 60000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                    realtimeChart.data.labels.push(pastTime);
+                    realtimeChart.data.datasets[0].data.push(suhu);
+                    realtimeChart.data.datasets[1].data.push(lembab);
+                    isFirstData = false;
+                }
+
+                if (realtimeChart.data.labels.length >= 20) {
+                    realtimeChart.data.labels.shift();
+                    realtimeChart.data.datasets[0].data.shift();
+                    realtimeChart.data.datasets[1].data.shift();
+                }
                 realtimeChart.data.labels.push(timeStr);
                 realtimeChart.data.datasets[0].data.push(suhu);
                 realtimeChart.data.datasets[1].data.push(lembab);
@@ -495,14 +559,14 @@
                 row.className = 'hover:bg-gray-900/40 border-b border-gray-800/60';
                 row.innerHTML = `
                     <td class="px-4 py-3 font-mono text-gray-400">${timeStr}</td>
-                    <td class="px-4 py-3 font-bold text-emerald-400">${suhu} °C</td>
+                    <td class="px-4 py-3 font-bold text-orange-400">${suhu} °C</td>
                     <td class="px-4 py-3 font-bold text-blue-400">${lembab} %</td>
                     <td class="px-4 py-3">${wc}</td>
                     <td class="px-4 py-3">${tamu}</td>
                     <td class="px-4 py-3">${belakang}</td>
                     <td class="px-4 py-3">${hias}</td>
                 `;
-                tbody.appendChild(row); // Data bertambah ke bawah
+                tbody.appendChild(row);
             }
         }
 
