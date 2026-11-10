@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home IoT - Dashboard & Control</title>
+
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0B131F; color: #F3F4F6; }
+        .glass-card { background: rgba(16, 26, 43, 0.75); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
+        .active-tab { background: linear-gradient(135deg, #10B981 0%, #059669 100%); color: #FFFFFF !important; box-shadow: 0 4px 14px 0 rgba(16, 185, 129, 0.39); }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0B131F; }
+        ::-webkit-scrollbar-thumb { background: #1F2937; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #10B981; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col lg:flex-row overflow-x-hidden">
+
+    <!-- SIDEBAR NAVIGASI -->
+    <aside class="w-full lg:w-64 bg-[#080E17] border-r border-gray-800/60 p-6 flex flex-col justify-between shrink-0">
+        <div>
+            <div class="flex items-center space-x-3 mb-10">
+                <div class="p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-400">
+                    <i data-lucide="home" class="w-6 h-6"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-lg text-white leading-tight">Smart Home <span class="text-emerald-400">IoT</span></h1>
+                    <p class="text-xs text-gray-400">Firebase Realtime</p>
+                </div>
+            </div>
+
+            <nav class="space-y-2">
+                <button onclick="switchTab('dashboard')" id="nav-dashboard" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800/40 hover:text-white transition-all active-tab">
+                    <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Dashboard</span>
+                </button>
+                <button onclick="switchTab('lampu')" id="nav-lampu" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800/40 hover:text-white transition-all">
+                    <i data-lucide="lightbulb" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Kontrol Lampu</span>
+                </button>
+                <button onclick="switchTab('monitoring')" id="nav-monitoring" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800/40 hover:text-white transition-all">
+                    <i data-lucide="line-chart" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Monitoring</span>
+                </button>
+                <button onclick="switchTab('riwayat')" id="nav-riwayat" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800/40 hover:text-white transition-all">
+                    <i data-lucide="history" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Riwayat Data</span>
+                </button>
+                <button onclick="switchTab('pengaturan')" id="nav-pengaturan" class="w-full flex items-center space-x-3 px-4 py-3 rounded-xl text-gray-400 hover:bg-gray-800/40 hover:text-white transition-all">
+                    <i data-lucide="settings" class="w-5 h-5"></i>
+                    <span class="font-medium text-sm">Pengaturan</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-800/60 space-y-3">
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-400">Koneksi Firebase</span>
+                <span id="firebase-status" class="flex items-center text-emerald-400 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping mr-1.5"></span> Connected
+                </span>
+            </div>
+            <div class="flex items-center justify-between text-xs">
+                <span class="text-gray-400">ESP32 Device</span>
+                <span id="esp32-status" class="text-emerald-400 font-medium">Active (4 Relay)</span>
+            </div>
+        </div>
+    </aside>
+
+    <!-- KONTEN UTAMA -->
+    <main class="flex-1 p-6 lg:p-8 overflow-y-auto max-w-7xl mx-auto w-full space-y-8">
+        
+        <header class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-800/40">
+            <div>
+                <h2 id="page-title" class="text-2xl font-bold text-white">Dashboard Smart Home</h2>
+                <p id="page-subtitle" class="text-sm text-gray-400 mt-1">Monitoring lingkungan dan kontrol lampu rumah secara real-time</p>
+            </div>
+            <div class="flex items-center space-x-4 bg-gray-900/60 border border-gray-800 px-4 py-2 rounded-xl text-xs text-gray-300">
+                <div class="flex items-center space-x-2">
+                    <i data-lucide="wifi" class="w-4 h-4 text-emerald-400"></i>
+                    <span id="time-display">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 1. TAB DASHBOARD -->
+        <section id="tab-dashboard" class="space-y-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Suhu -->
+                <div class="glass-card rounded-2xl p-6 relative overflow-hidden flex flex-col items-center">
+                    <div class="w-full flex justify-between items-center mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg">
+                                <i data-lucide="thermometer" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-base">Suhu</h3>
+                                <p class="text-xs text-gray-400">Sensor DHT11</p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 rounded-full text-xs font-semibold">Normal</span>
+                    </div>
+                    <div class="relative w-64 h-36 flex justify-center items-end mt-4">
+                        <canvas id="suhuGauge"></canvas>
+                        <div class="absolute bottom-2 text-center">
+                            <span id="val-suhu" class="text-4xl font-extrabold text-white">0.0</span>
+                            <span class="text-xl text-emerald-400 font-bold">°C</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Kelembaban -->
+                <div class="glass-card rounded-2xl p-6 relative overflow-hidden flex flex-col items-center">
+                    <div class="w-full flex justify-between items-center mb-2">
+                        <div class="flex items-center space-x-3">
+                            <div class="p-2 bg-blue-500/10 text-blue-400 rounded-lg">
+                                <i data-lucide="droplets" class="w-5 h-5"></i>
+                            </div>
+                            <div>
+                                <h3 class="font-semibold text-white text-base">Kelembaban</h3>
+                                <p class="text-xs text-gray-400">Sensor DHT11</p>
+                            </div>
+                        </div>
+                        <span class="px-3 py-1 bg-blue-500/10 text-blue-400 border border-blue-500/30 rounded-full text-xs font-semibold">Ideal</span>
+                    </div>
+                    <div class="relative w-64 h-36 flex justify-center items-end mt-4">
+                        <canvas id="kelembabanGauge"></canvas>
+                        <div class="absolute bottom-2 text-center">
+                            <span id="val-kelembaban" class="text-4xl font-extrabold text-white">0</span>
+                            <span class="text-xl text-blue-400 font-bold">%RH</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- KONTROL 4 LAMPU (DASHBOARD) -->
+            <div class="glass-card rounded-2xl p-6 space-y-6">
+                <div class="flex justify-between items-center border-b border-gray-800/60 pb-4">
+                    <div>
+                        <h3 class="font-bold text-lg text-white">Kontrol Lampu Utama</h3>
+                        <p class="text-xs text-gray-400">Terhubung ke Relay ESP32</p>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="setAllRelays(1)" class="px-3 py-1.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-semibold">Nyalakan Semua</button>
+                        <button onclick="setAllRelays(0)" class="px-3 py-1.5 bg-rose-500/20 text-rose-400 border border-rose-500/30 rounded-lg text-xs font-semibold">Matikan Semua</button>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Lampu WC -->
+                    <div id="card-LampuWC" class="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-LampuWC" class="p-2 bg-gray-800 text-gray-500 rounded-lg"><i data-lucide="lightbulb" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-LampuWC" onchange="toggleRelay('LampuWC', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <h4 class="font-bold text-white text-sm">Lampu WC</h4>
+                        <div class="mt-3 flex justify-between items-center text-xs">
+                            <span class="text-gray-400">Status:</span>
+                            <span id="status-LampuWC" class="font-semibold text-gray-500">OFF</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu Ruang Tamu -->
+                    <div id="card-LampuRuangTamu" class="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-LampuRuangTamu" class="p-2 bg-gray-800 text-gray-500 rounded-lg"><i data-lucide="lightbulb" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-LampuRuangTamu" onchange="toggleRelay('LampuRuangTamu', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <h4 class="font-bold text-white text-sm">Lampu Ruang Tamu</h4>
+                        <div class="mt-3 flex justify-between items-center text-xs">
+                            <span class="text-gray-400">Status:</span>
+                            <span id="status-LampuRuangTamu" class="font-semibold text-gray-500">OFF</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu Belakang -->
+                    <div id="card-LampuBelakang" class="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-LampuBelakang" class="p-2 bg-gray-800 text-gray-500 rounded-lg"><i data-lucide="lightbulb" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-LampuBelakang" onchange="toggleRelay('LampuBelakang', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <h4 class="font-bold text-white text-sm">Lampu Belakang</h4>
+                        <div class="mt-3 flex justify-between items-center text-xs">
+                            <span class="text-gray-400">Status:</span>
+                            <span id="status-LampuBelakang" class="font-semibold text-gray-500">OFF</span>
+                        </div>
+                    </div>
+
+                    <!-- Lampu Hias -->
+                    <div id="card-LampuHias" class="bg-gray-900/60 border border-gray-800 rounded-xl p-4">
+                        <div class="flex justify-between items-start mb-3">
+                            <div id="icon-LampuHias" class="p-2 bg-gray-800 text-gray-500 rounded-lg"><i data-lucide="sparkles" class="w-5 h-5"></i></div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="toggle-LampuHias" onchange="toggleRelay('LampuHias', this.checked)" class="sr-only peer">
+                                <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                            </label>
+                        </div>
+                        <h4 class="font-bold text-white text-sm">Lampu Hias</h4>
+                        <div class="mt-3 flex justify-between items-center text-xs">
+                            <span class="text-gray-400">Status:</span>
+                            <span id="status-LampuHias" class="font-semibold text-gray-500">OFF</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. TAB KONTROL LAMPU (TOGGLE SWITCH) -->
+        <section id="tab-lampu" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-6 space-y-6">
+                <div class="flex justify-between items-center border-b border-gray-800/60 pb-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-white">Pusat Manajemen Saklar & Relay</h3>
+                        <p class="text-xs text-gray-400 mt-1">Kendalikan status lampu secara langsung menggunakan tombol sakelar</p>
+                    </div>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <!-- Lampu WC -->
+                    <div class="bg-gray-900/60 border border-gray-800 hover:border-emerald-500/40 rounded-xl p-5 flex justify-between items-center transition-all">
+                        <span class="font-bold text-white text-sm">Lampu WC</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-LampuWC-det" onchange="toggleRelay('LampuWC', this.checked)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                        </label>
+                    </div>
+
+                    <!-- Lampu Ruang Tamu -->
+                    <div class="bg-gray-900/60 border border-gray-800 hover:border-emerald-500/40 rounded-xl p-5 flex justify-between items-center transition-all">
+                        <span class="font-bold text-white text-sm">Lampu Ruang Tamu</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-LampuRuangTamu-det" onchange="toggleRelay('LampuRuangTamu', this.checked)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                        </label>
+                    </div>
+
+                    <!-- Lampu Belakang -->
+                    <div class="bg-gray-900/60 border border-gray-800 hover:border-emerald-500/40 rounded-xl p-5 flex justify-between items-center transition-all">
+                        <span class="font-bold text-white text-sm">Lampu Belakang</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-LampuBelakang-det" onchange="toggleRelay('LampuBelakang', this.checked)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                        </label>
+                    </div>
+
+                    <!-- Lampu Hias -->
+                    <div class="bg-gray-900/60 border border-gray-800 hover:border-emerald-500/40 rounded-xl p-5 flex justify-between items-center transition-all">
+                        <span class="font-bold text-white text-sm">Lampu Hias</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="toggle-LampuHias-det" onchange="toggleRelay('LampuHias', this.checked)" class="sr-only peer">
+                            <div class="w-11 h-6 bg-gray-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 3. TAB MONITORING (GRAFIK GARIS TEGAS) -->
+        <section id="tab-monitoring" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-6">
+                <h3 class="text-lg font-bold text-white mb-4">Grafik Tren Suhu & Kelembaban (Interval 20 Menit)</h3>
+                <div class="w-full h-80"><canvas id="realtimeChart"></canvas></div>
+            </div>
+        </section>
+
+        <!-- 4. TAB RIWAYAT & EXCEL (BERTAMBAH KE BAWAH) -->
+        <section id="tab-riwayat" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-6 space-y-6">
+                <div class="flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-white">Tabel Log Riwayat (Interval 20 Menit)</h3>
+                    <button onclick="exportToExcel()" class="px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl text-xs font-semibold">Unduh File Excel (.csv)</button>
+                </div>
+                <div class="overflow-x-auto border border-gray-800 rounded-xl">
+                    <table class="w-full text-left text-xs text-gray-300">
+                        <thead class="bg-gray-900/80 text-gray-400 uppercase border-b border-gray-800">
+                            <tr>
+                                <th class="px-4 py-3">Waktu</th>
+                                <th class="px-4 py-3">Suhu</th>
+                                <th class="px-4 py-3">Kelembaban</th>
+                                <th class="px-4 py-3">WC</th>
+                                <th class="px-4 py-3">Tamu</th>
+                                <th class="px-4 py-3">Belakang</th>
+                                <th class="px-4 py-3">Hias</th>
+                            </tr>
+                        </thead>
+                        <tbody id="excel-table-body" class="divide-y divide-gray-800/60"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5. TAB PENGATURAN -->
+        <section id="tab-pengaturan" class="space-y-6 hidden">
+            <div class="glass-card rounded-2xl p-6 space-y-4">
+                <h3 class="text-lg font-bold text-white">Konfigurasi Firebase</h3>
+                <p class="text-xs text-gray-400 font-mono">URL: https://tes1firebaseled-default-rtdb.asia-southeast1.firebasedatabase.app/</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- FIREBASE SDK v8 -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyCB6RzUSIyuKf-5t3453v2BXsUd_2Udrjo",
+            databaseURL: "https://tes1firebaseled-default-rtdb.asia-southeast1.firebasedatabase.app/"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        window.historyLog = [];
+        const relayKeys = ['LampuWC', 'LampuRuangTamu', 'LampuBelakang', 'LampuHias'];
+
+        let currentSuhu = 0;
+        let currentKelembaban = 0;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initGauges();
+            initChart();
+            lucide.createIcons();
+
+            db.ref('sensor/suhu').on('value', snapshot => {
+                const val = snapshot.val() || 0;
+                currentSuhu = parseFloat(val).toFixed(1);
+                updateSuhu(currentSuhu);
+            });
+
+            db.ref('sensor/kelembaban').on('value', snapshot => {
+                const val = snapshot.val() || 0;
+                currentKelembaban = parseInt(val);
+                updateKelembaban(currentKelembaban);
+            });
+
+            // Catat data pertama kali setelah 1 detik agar grafik langsung muncul titik/garisnya
+            setTimeout(() => {
+                pushLogAndChart();
+            }, 1000);
+
+            // Interval 20 Menit untuk Log & Grafik selanjutnya
+            setInterval(() => {
+                pushLogAndChart();
+            }, 20 * 60 * 1000); 
+
+            relayKeys.forEach(key => {
+                db.ref(`Kontrol/${key}`).on('value', snapshot => {
+                    const val = snapshot.val() || 0;
+                    updateRelayUI(key, val === 1);
+                });
+            });
+
+            setInterval(() => {
+                document.getElementById('time-display').innerText = new Date().toLocaleString('id-ID');
+            }, 1000);
+        });
+
+        window.toggleRelay = function(key, isChecked) {
+            db.ref(`Kontrol/${key}`).set(isChecked ? 1 : 0);
+        };
+
+        window.setAllRelays = function(val) {
+            relayKeys.forEach(key => {
+                db.ref(`Kontrol/${key}`).set(val);
+            });
+        };
+
+        function updateRelayUI(key, isOn) {
+            const toggle = document.getElementById(`toggle-${key}`);
+            const toggleDet = document.getElementById(`toggle-${key}-det`);
+            const statusText = document.getElementById(`status-${key}`);
+            const card = document.getElementById(`card-${key}`);
+            const icon = document.getElementById(`icon-${key}`);
+
+            if (toggle) toggle.checked = isOn;
+            if (toggleDet) toggleDet.checked = isOn;
+            if (statusText) {
+                statusText.innerText = isOn ? 'ON' : 'OFF';
+                statusText.className = isOn ? 'font-semibold text-emerald-400' : 'font-semibold text-gray-500';
+            }
+            if (card) card.className = isOn ? "bg-emerald-950/20 border border-emerald-500/40 rounded-xl p-4" : "bg-gray-900/60 border border-gray-800 rounded-xl p-4";
+            if (icon) icon.className = isOn ? "p-2 bg-emerald-500/20 text-emerald-400 rounded-lg" : "p-2 bg-gray-800 text-gray-500 rounded-lg";
+        }
+
+        let suhuGaugeChart, kelembabanGaugeChart, realtimeChart;
+
+        function initGauges() {
+            const opts = { rotation: -90, circumference: 180, cutout: '80%', plugins: { tooltip: { enabled: false } } };
+            suhuGaugeChart = new Chart(document.getElementById('suhuGauge').getContext('2d'), {
+                type: 'doughnut', data: { datasets: [{ data: [0, 50], backgroundColor: ['#10B981', '#1F2937'], borderWidth: 0 }] }, options: opts
+            });
+            kelembabanGaugeChart = new Chart(document.getElementById('kelembabanGauge').getContext('2d'), {
+                type: 'doughnut', data: { datasets: [{ data: [0, 100], backgroundColor: ['#3B82F6', '#1F2937'], borderWidth: 0 }] }, options: opts
+            });
+        }
+
+        function updateSuhu(val) {
+            document.getElementById('val-suhu').innerText = val;
+            if (suhuGaugeChart) {
+                suhuGaugeChart.data.datasets[0].data = [val, Math.max(0, 50 - val)];
+                suhuGaugeChart.update();
+            }
+        }
+
+        function updateKelembaban(val) {
+            document.getElementById('val-kelembaban').innerText = val;
+            if (kelembabanGaugeChart) {
+                kelembabanGaugeChart.data.datasets[0].data = [val, Math.max(0, 100 - val)];
+                kelembabanGaugeChart.update();
+            }
+        }
+
+        // Inisialisasi Grafik Line Chart
+        function initChart() {
+            const ctx = document.getElementById('realtimeChart').getContext('2d');
+            realtimeChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [
+                        { 
+                            label: 'Suhu (°C)', 
+                            data: [], 
+                            borderColor: '#10B981', 
+                            backgroundColor: 'transparent', 
+                            borderWidth: 2, 
+                            tension: 0.1, 
+                            pointRadius: 4
+                        },
+                        { 
+                            label: 'Kelembaban (%)', 
+                            data: [], 
+                    borderColor: '#ef4444', 
+                            backgroundColor: 'transparent', 
+                            borderWidth: 2, 
+                            tension: 0.1, 
+                            pointRadius: 4
+                        }
+                    ]
+                },
+                options: { 
+                    responsive: true, 
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' } },
+                        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9CA3AF' }, beginAtZero: true, max: 100 }
+                    },
+                    plugins: { legend: { labels: { color: '#F3F4F6' } } }
+                }
+            });
+        }
+
+        function pushLogAndChart() {
+            const timeStr = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+            const suhu = currentSuhu;
+            const lembab = currentKelembaban;
+            const wc = document.getElementById('status-LampuWC').innerText;
+            const tamu = document.getElementById('status-LampuRuangTamu').innerText;
+            const belakang = document.getElementById('status-LampuBelakang').innerText;
+            const hias = document.getElementById('status-LampuHias').innerText;
+
+            if (realtimeChart) {
+                realtimeChart.data.labels.push(timeStr);
+                realtimeChart.data.datasets[0].data.push(suhu);
+                realtimeChart.data.datasets[1].data.push(lembab);
+                realtimeChart.update();
+            }
+
+            const entry = { timeStr, suhu, lembab, wc, tamu, belakang, hias };
+            window.historyLog.push(entry);
+
+            const tbody = document.getElementById('excel-table-body');
+            if (tbody) {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-900/40 border-b border-gray-800/60';
+                row.innerHTML = `
+                    <td class="px-4 py-3 font-mono text-gray-400">${timeStr}</td>
+                    <td class="px-4 py-3 font-bold text-emerald-400">${suhu} °C</td>
+                    <td class="px-4 py-3 font-bold text-blue-400">${lembab} %</td>
+                    <td class="px-4 py-3">${wc}</td>
+                    <td class="px-4 py-3">${tamu}</td>
+                    <td class="px-4 py-3">${belakang}</td>
+                    <td class="px-4 py-3">${hias}</td>
+                `;
+                tbody.appendChild(row); // Data bertambah ke bawah
+            }
+        }
+
+        function switchTab(tabName) {
+            ['dashboard', 'lampu', 'monitoring', 'riwayat', 'pengaturan'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                document.getElementById(`nav-${t}`).classList.remove('active-tab');
+            });
+            document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+            document.getElementById(`nav-${tabName}`).classList.add('active-tab');
+        }
+
+        function exportToExcel() {
+            if (!window.historyLog || window.historyLog.length === 0) {
+                alert('Belum ada data riwayat untuk diunduh!');
+                return;
+            }
+            let csvContent = "data:text/csv;charset=utf-8,Waktu,Suhu (C),Kelembaban (%),Lampu WC,Lampu Ruang Tamu,Lampu Belakang,Lampu Hias\n";
+            window.historyLog.forEach(row => {
+                csvContent += `${row.timeStr},${row.suhu},${row.lembab},${row.wc},${row.tamu},${row.belakang},${row.hias}\n`;
+            });
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", `Log_SmartHome_IoT_${new Date().toISOString().slice(0,10)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
